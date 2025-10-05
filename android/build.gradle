@@ -1,0 +1,75 @@
+ext {
+    buildToolsVersion = "34.0.0"
+    minSdkVersion = 24
+    compileSdkVersion = 34
+    targetSdkVersion = 34
+    ndkVersion = "25.2.9519653"
+        kotlinVersion = "1.9.10"
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.4'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10'
+        classpath 'com.google.gms:google-services:4.4.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://www.jitpack.io" }
+        maven { url "https://maven.google.com" }
+        maven { url "https://maven.pkg.jetbrains.space/public/p/react-native-android/releases" }
+        maven { url "https://maven.pkg.jetbrains.space/public/p/react-native-android/snapshots" }
+    }
+    
+    // Force all projects to use Java 17
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            android {
+                compileSdk 34
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                if (project.hasProperty("kotlinOptions")) {
+                    kotlinOptions {
+                        jvmTarget = '17'
+                    }
+                }
+            }
+        }
+    }
+    
+    // Global dependency substitution to fix React Native dependency issue
+    configurations.all {
+        resolutionStrategy {
+            dependencySubstitution {
+                substitute module('com.facebook.react:react-native') using module('com.facebook.react:react-android:0.72.17')
+            }
+        }
+    }
+    
+    // Global Java version settings to fix JVM compatibility issues
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                if (project.hasProperty("kotlinOptions")) {
+                    kotlinOptions {
+                        jvmTarget = '17'
+                    }
+                }
+            }
+        }
+    }
+}
