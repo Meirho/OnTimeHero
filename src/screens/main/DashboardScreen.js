@@ -15,6 +15,10 @@ import moment from 'moment';
 import NextEventCard from '../../components/dashboard/NextEventCard';
 import StreakWidget from '../../components/dashboard/StreakWidget';
 import QuickStats from '../../components/dashboard/QuickStats';
+import GoogleCalendarService from '../../services/GoogleCalendarService';
+import GamificationService from '../../services/GamificationService';
+import NotificationService from '../../services/NotificationService';
+import LocationService from '../../services/LocationService';
 
 const DashboardScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);

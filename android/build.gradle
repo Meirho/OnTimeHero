@@ -1,7 +1,7 @@
 ext {
-    buildToolsVersion = "34.0.0"
+    buildToolsVersion = "35.0.0"
     minSdkVersion = 24
-    compileSdkVersion = 34
+    compileSdkVersion = 35
     targetSdkVersion = 34
     ndkVersion = "25.2.9519653"
         kotlinVersion = "1.9.10"
@@ -13,7 +13,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.4'
+        classpath 'com.android.tools.build:gradle:8.6.0'
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10'
         classpath 'com.google.gms:google-services:4.4.1'
     }
@@ -33,7 +33,7 @@ allprojects {
     afterEvaluate { project ->
         if (project.hasProperty("android")) {
             android {
-                compileSdk 34
+                compileSdk 35
                 compileOptions {
                     sourceCompatibility JavaVersion.VERSION_17
                     targetCompatibility JavaVersion.VERSION_17
@@ -52,6 +52,7 @@ allprojects {
         resolutionStrategy {
             dependencySubstitution {
                 substitute module('com.facebook.react:react-native') using module('com.facebook.react:react-android:0.72.17')
+                substitute module('com.facebook.react:react-android') using module('com.facebook.react:react-android:0.72.17')
             }
         }
     }

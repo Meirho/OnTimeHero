@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Clock Circle Background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24C37.4,24,24,37.4,24,54s13.4,30,30,30s30-13.4,30-30S70.6,24,54,24z M54,80C39.6,80,28,68.4,28,54s11.6-26,26-26s26,11.6,26,26S68.4,80,54,80z"/>
+    
+    <!-- Clock Hands -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,32v24l16,16l-2.8,2.8L50,57.6V32H54z"/>
+    
+    <!-- Hero Star Badge -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M72,36l3.6,7.2l8,1.2l-5.8,5.6l1.4,8l-7.2-3.8l-7.2,3.8l1.4-8l-5.8-5.6l8-1.2z"/>
+</vector>
+

@@ -188,16 +188,140 @@ class NotificationService {
   }
 
   showStreakNotification(streakCount) {
+    const messages = [
+      `You're on a ${streakCount}-day streak! Keep it up! 🔥`,
+      `Amazing! ${streakCount} days in a row! 🎉`,
+      `Your ${streakCount}-day streak is impressive! 💪`,
+      `Don't break the chain! ${streakCount} days strong! ⛓️`,
+    ];
+
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
     PushNotification.localNotification({
       channelId: 'achievements',
-      title: `🔥 ${streakCount} Day Streak!`,
-      message: 'Keep up the great work! Your punctuality is on fire!',
+      title: '🔥 Streak Update!',
+      message: randomMessage,
       playSound: true,
       vibrate: true,
       data: {
         type: 'streak',
         streakCount,
       },
+    });
+  }
+
+  showLevelUpNotification(newLevel) {
+    PushNotification.localNotification({
+      channelId: 'achievements',
+      title: '⭐ Level Up!',
+      message: `Congratulations! You've reached level ${newLevel}!`,
+      playSound: true,
+      vibrate: true,
+      data: {
+        type: 'level_up',
+        newLevel,
+      },
+    });
+  }
+
+  showArrivalNotification(event, wasOnTime) {
+    const title = wasOnTime ? '🎉 Great Job!' : '⚠️ Running Late';
+    const message = wasOnTime 
+      ? `You arrived on time for "${event.title}"! +50 XP`
+      : `You're running late for "${event.title}". Try to leave earlier next time.`;
+
+    PushNotification.localNotification({
+      channelId: 'achievements',
+      title,
+      message,
+      playSound: true,
+      vibrate: true,
+      data: {
+        type: 'arrival',
+        eventId: event.id,
+        wasOnTime,
+      },
+    });
+  }
+
+  showMotivationalMessage() {
+    const messages = [
+      "You've got this! Time to be your most punctual self! 💪",
+      "Every journey starts with leaving on time! 🚀",
+      "Punctuality is the politeness of kings! 👑",
+      "Success is where preparation meets opportunity! ✨",
+      "The early bird catches the worm! 🐦",
+      "Be the hero of your own time story! 🦸‍♀️",
+    ];
+
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+    PushNotification.localNotification({
+      channelId: 'reminders',
+      title: '💡 Daily Motivation',
+      message: randomMessage,
+      playSound: false,
+      vibrate: false,
+      data: {
+        type: 'motivation',
+      },
+    });
+  }
+
+  scheduleDailyMotivation() {
+    // Schedule daily motivation at 8 AM
+    const tomorrow = moment().add(1, 'day').hour(8).minute(0).second(0).toDate();
+
+    PushNotification.localNotificationSchedule({
+      id: 'daily_motivation',
+      channelId: 'reminders',
+      title: '💡 Daily Motivation',
+      message: 'Start your day with punctuality!',
+      date: tomorrow,
+      playSound: false,
+      vibrate: false,
+      repeatType: 'day',
+      data: {
+        type: 'daily_motivation',
+      },
+    });
+  }
+
+  scheduleWeeklyReport() {
+    // Schedule weekly report on Sundays at 9 AM
+    const nextSunday = moment().day(7).hour(9).minute(0).second(0).toDate();
+
+    PushNotification.localNotificationSchedule({
+      id: 'weekly_report',
+      channelId: 'achievements',
+      title: '📊 Weekly Report',
+      message: 'Check out your punctuality stats for this week!',
+      date: nextSunday,
+      playSound: true,
+      soundName: 'default',
+      repeatType: 'week',
+      data: {
+        type: 'weekly_report',
+      },
+    });
+  }
+
+  cancelEventNotifications(eventId) {
+    const notifications = this.getScheduledNotifications();
+    notifications.then(scheduledNotifications => {
+      scheduledNotifications.forEach(notification => {
+        if (notification.userInfo?.eventId === eventId) {
+          this.cancelNotification(notification.id);
+        }
+      });
+    });
+  }
+
+  getScheduledNotifications() {
+    return new Promise((resolve) => {
+      PushNotification.getScheduledLocalNotifications((notifications) => {
+        resolve(notifications);
+      });
     });
   }
 }

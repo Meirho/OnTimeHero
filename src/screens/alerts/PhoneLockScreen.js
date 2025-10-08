@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import BackgroundTimer from 'react-native-background-timer';
+// import BackgroundTimer from 'react-native-background-timer';
 import LockService from '../../services/LockService';
 import HapticFeedback from 'react-native-haptic-feedback';
 
@@ -33,19 +33,19 @@ const PhoneLockScreen = ({ route, navigation }) => {
     startCountdown();
 
     return () => {
-      BackgroundTimer.clearInterval(countdownInterval);
+      clearInterval(countdownInterval);
     };
   }, []);
 
   const startCountdown = () => {
-    countdownInterval = BackgroundTimer.setInterval(() => {
+    countdownInterval = setInterval(() => {
       const eventTime = new Date(event.startTime.toDate());
       const now = new Date();
       const diff = eventTime - now;
 
       if (diff <= 0) {
         setCountdown('00:00');
-        BackgroundTimer.clearInterval(countdownInterval);
+        clearInterval(countdownInterval);
       } else {
         const minutes = Math.floor(diff / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);

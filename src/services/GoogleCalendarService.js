@@ -9,18 +9,80 @@ class GoogleCalendarService {
   }
 
   configureGoogleSignIn() {
-    GoogleSignin.configure({
-      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-      webClientId: 'YOUR_WEB_CLIENT_ID',
-    });
+    try {
+      GoogleSignin.configure({
+        // Request Calendar read access and profile/email for Firebase linking
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'email', 'profile'],
+        webClientId: '103336096230-8lm4urgu3a703cb0cj3lsdfj3uo6b36r.apps.googleusercontent.com',
+        offlineAccess: true,
+        forceCodeForRefreshToken: true,
+        // Mobile app configuration - NO client secret needed
+        hostedDomain: '',
+        loginHint: '',
+        accountName: '',
+        // Disable auto sign-in to avoid NativeEventEmitter issues
+        autoSignIn: false,
+        // Explicitly disable client secret usage for mobile apps
+        clientSecret: undefined,
+      });
+      console.log('Google Sign-In configured successfully for mobile app');
+    } catch (error) {
+      console.error('Error configuring Google Sign-In:', error);
+    }
+  }
+
+  async ensureSignedIn() {
+    try {
+      // Check if Google Play Services are available
+      const hasPlayServices = await GoogleSignin.hasPlayServices({ 
+        showPlayServicesUpdateDialog: true 
+      });
+      if (!hasPlayServices) {
+        throw new Error('Google Play Services not available');
+      }
+
+      // Try to get current user first
+      const currentUser = await GoogleSignin.getCurrentUser();
+      if (currentUser) {
+        return currentUser;
+      }
+
+      // Try silent sign-in
+      const userInfo = await GoogleSignin.signInSilently();
+      return userInfo;
+    } catch (error) {
+      console.log('Silent sign-in failed, prompting user:', error.message);
+      
+      try {
+        // No cached session → ask user to pick account
+        const userInfo = await GoogleSignin.signIn();
+        return userInfo;
+      } catch (signInError) {
+        console.error('Google Sign-In failed:', signInError);
+        throw new Error(`Google Sign-In failed: ${signInError.message}`);
+      }
+    }
   }
 
   async syncCalendarEvents() {
     try {
-      const userInfo = await GoogleSignin.signInSilently();
+      console.log('Starting calendar sync...');
+      
+      // Ensure the user is signed in with Calendar scope
+      const userInfo = await this.ensureSignedIn();
+      if (!userInfo) {
+        throw new Error('User not signed in');
+      }
+
+      console.log('User signed in, getting tokens...');
       const tokens = await GoogleSignin.getTokens();
       const accessToken = tokens.accessToken;
 
+      if (!accessToken) {
+        throw new Error('No access token available');
+      }
+
+      console.log('Fetching calendar events...');
       // Fetch events from Google Calendar API
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -31,13 +93,22 @@ class GoogleCalendarService {
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
         }
       );
 
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Calendar API error:', response.status, errorData);
+        throw new Error(`Calendar API error: ${response.status} - ${errorData}`);
+      }
+
       const data = await response.json();
+      console.log('Calendar API response:', data);
       
       if (data.items) {
+        console.log(`Found ${data.items.length} events, saving to Firestore...`);
         await this.saveEventsToFirestore(data.items);
       }
 

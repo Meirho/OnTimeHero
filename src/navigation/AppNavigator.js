@@ -6,7 +6,10 @@ import { AuthContext } from '../contexts/AuthContext';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
+import SignupScreen from '../screens/auth/SignupScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
+import CalendarScreen from '../screens/main/CalendarScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
 import PhoneLockScreen from '../screens/alerts/PhoneLockScreen';
 
 const Stack = createStackNavigator();
@@ -35,8 +38,8 @@ const MainTabNavigator = () => {
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Calendar" component={DashboardScreen} />
-      <Tab.Screen name="Profile" component={DashboardScreen} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 };
@@ -52,7 +55,10 @@ const AppNavigator = () => {
           <Stack.Screen name="PhoneLock" component={PhoneLockScreen} />
         </>
       ) : (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Signup" component={SignupScreen} />
+        </>
       )}
     </Stack.Navigator>
   );

@@ -105,4 +105,4 @@ build/
 *~
 
 # OS generated files
-Thumbs.db
+Thumbs.dbclient_secret_*.json

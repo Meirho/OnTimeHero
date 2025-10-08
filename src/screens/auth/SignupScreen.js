@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Alert
@@ -15,26 +14,34 @@ import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-GoogleSignin.configure({
-  webClientId: '103336096230-7ujf978u25uj50dp43se69t7idqfggi8.apps.googleusercontent.com',
-});
-
-const LoginScreen = ({ navigation }) => {
+const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const handleSignup = async () => {
+    if (!email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
     setLoading(true);
     try {
-      await auth().signInWithEmailAndPassword(email, password);
+      await auth().createUserWithEmailAndPassword(email, password);
+      Alert.alert('Success', 'Account created successfully!');
     } catch (error) {
-      Alert.alert('Login Error', error.message);
+      Alert.alert('Signup Error', error.message);
     } finally {
       setLoading(false);
     }
@@ -92,13 +99,25 @@ const LoginScreen = ({ navigation }) => {
             />
           </View>
 
+          <View style={styles.inputContainer}>
+            <Icon name="lock" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#999"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
           <TouchableOpacity
-            style={[styles.loginButton, loading && styles.disabledButton]}
-            onPress={handleLogin}
+            style={[styles.signupButton, loading && styles.disabledButton]}
+            onPress={handleSignup}
             disabled={loading}
           >
-            <Text style={styles.loginButtonText}>
-              {loading ? 'Logging in...' : 'Login'}
+            <Text style={styles.signupButtonText}>
+              {loading ? 'Creating Account...' : 'Sign Up'}
             </Text>
           </TouchableOpacity>
 
@@ -107,13 +126,13 @@ const LoginScreen = ({ navigation }) => {
             onPress={handleGoogleSignIn}
           >
             <Icon name="g-mobiledata" size={24} color="#fff" />
-            <Text style={styles.googleButtonText}>Sign in with Google</Text>
+            <Text style={styles.googleButtonText}>Sign up with Google</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-              <Text style={styles.signupLink}>Sign Up</Text>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.loginLink}>Login</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -173,8 +192,8 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
   },
-  loginButton: {
-    backgroundColor: '#4CAF50',
+  signupButton: {
+    backgroundColor: '#FF6B6B',
     borderRadius: 25,
     height: 50,
     justifyContent: 'center',
@@ -189,7 +208,7 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.7,
   },
-  loginButtonText: {
+  signupButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
@@ -219,11 +238,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
   },
-  signupLink: {
+  loginLink: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
   },
 });
 
-export default LoginScreen;
+export default SignupScreen;
+

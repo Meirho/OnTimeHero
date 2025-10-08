@@ -1,5 +1,4 @@
 import { NativeModules, DeviceEventEmitter, AppState } from 'react-native';
-import BackgroundTimer from 'react-native-background-timer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from 'react-native-geolocation-service';
 
@@ -38,7 +37,7 @@ class LockService {
     const timeUntilEvent = eventTime - now;
 
     if (timeUntilEvent > 0) {
-      BackgroundTimer.setTimeout(() => {
+      this.lockTimer = setTimeout(() => {
         this.unlock('Event started');
       }, timeUntilEvent);
     }
@@ -158,7 +157,9 @@ class LockService {
     }
 
     // Clear timers
-    BackgroundTimer.clearTimeout(this.lockTimer);
+    if (this.lockTimer) {
+      clearTimeout(this.lockTimer);
+    }
 
     // Call unlock callback
     if (this.onUnlockCallback) {
