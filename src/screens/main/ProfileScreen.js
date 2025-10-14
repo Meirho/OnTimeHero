@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -28,6 +29,7 @@ const ProfileScreen = ({ navigation }) => {
     badges: [],
     achievements: [],
   });
+  const [userData, setUserData] = useState(null);
   const [recentAchievements, setRecentAchievements] = useState([]);
 
   useEffect(() => {
@@ -38,6 +40,13 @@ const ProfileScreen = ({ navigation }) => {
     const currentUser = auth().currentUser;
     if (!currentUser) return;
 
+    // Set basic user data from Firebase Auth
+    setUserData({
+      displayName: currentUser.displayName || 'OnTime Hero',
+      email: currentUser.email,
+      photoURL: currentUser.photoURL,
+    });
+
     try {
       const userDoc = await firestore()
         .collection('users')
@@ -45,17 +54,25 @@ const ProfileScreen = ({ navigation }) => {
         .get();
 
       if (userDoc.exists) {
-        const userData = userDoc.data();
+        const data = userDoc.data();
+        
+        // Update user data with Firestore data
+        setUserData({
+          displayName: data.displayName || currentUser.displayName || 'OnTime Hero',
+          email: data.email || currentUser.email,
+          photoURL: data.photoURL || currentUser.photoURL,
+        });
+        
         setUserStats({
-          xp: userData.xp || 0,
-          level: userData.level || 1,
-          currentStreak: userData.currentStreak || 0,
-          longestStreak: userData.longestStreak || 0,
-          totalEvents: userData.totalEvents || 0,
-          eventsOnTime: userData.eventsOnTime || 0,
-          punctualityScore: userData.punctualityScore || 0,
-          badges: userData.badges || [],
-          achievements: userData.achievements || [],
+          xp: data.xp || 0,
+          level: data.level || 1,
+          currentStreak: data.currentStreak || 0,
+          longestStreak: data.longestStreak || 0,
+          totalEvents: data.totalEvents || 0,
+          eventsOnTime: data.eventsOnTime || 0,
+          punctualityScore: data.punctualityScore || 0,
+          badges: data.badges || [],
+          achievements: data.achievements || [],
         });
 
         // Load recent achievements
@@ -73,6 +90,24 @@ const ProfileScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error loading user stats:', error);
+      
+      // Try to load from local storage on error
+      if (error.code === 'unavailable') {
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          const localProfile = await AsyncStorage.getItem('userProfile');
+          if (localProfile) {
+            const profileData = JSON.parse(localProfile);
+            setUserData({
+              displayName: profileData.displayName || 'OnTime Hero',
+              email: profileData.email,
+              photoURL: profileData.photoURL,
+            });
+          }
+        } catch (localError) {
+          console.error('Error loading local user data:', localError);
+        }
+      }
     }
   };
 
@@ -169,14 +204,19 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.profileInfo}>
             <View style={styles.avatarContainer}>
-              <LinearGradient colors={getLevelColor()} style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {userStats.level}
-                </Text>
-              </LinearGradient>
+              {userData?.photoURL ? (
+                <Image source={{ uri: userData.photoURL }} style={styles.avatarImage} />
+              ) : (
+                <LinearGradient colors={getLevelColor()} style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {userStats.level}
+                  </Text>
+                </LinearGradient>
+              )}
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>OnTime Hero</Text>
+              <Text style={styles.userName}>{userData?.displayName || 'OnTime Hero'}</Text>
+              <Text style={styles.userEmail}>{userData?.email}</Text>
               <Text style={styles.userLevel}>Level {userStats.level}</Text>
               <Text style={styles.userXP}>{userStats.xp} XP</Text>
             </View>
@@ -271,32 +311,32 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Settings */}
-        <View style={styles.settingsSection}>
-          <TouchableOpacity style={styles.settingItem}>
-            <Icon name="notifications" size={24} color="#fff" />
-            <Text style={styles.settingText}>Notifications</Text>
+        {/* Actions */}
+        <View style={styles.actionsSection}>
+          <TouchableOpacity 
+            style={styles.actionItem}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <Icon name="settings" size={24} color="#fff" />
+            <Text style={styles.actionText}>App Settings</Text>
             <Icon name="chevron-right" size={24} color="#fff" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingItem}>
-            <Icon name="calendar-today" size={24} color="#fff" />
-            <Text style={styles.settingText}>Calendar Sync</Text>
-            <Icon name="chevron-right" size={24} color="#fff" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity 
+            style={styles.actionItem}
+            onPress={() => navigation.navigate('HelpScreen')}
+          >
             <Icon name="help" size={24} color="#fff" />
-            <Text style={styles.settingText}>Help & Support</Text>
+            <Text style={styles.actionText}>Help & Guide</Text>
             <Icon name="chevron-right" size={24} color="#fff" />
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.settingItem, styles.logoutButton]}
+            style={[styles.actionItem, styles.logoutButton]}
             onPress={handleLogout}
           >
             <Icon name="logout" size={24} color="#ff6b6b" />
-            <Text style={[styles.settingText, styles.logoutText]}>Logout</Text>
+            <Text style={[styles.actionText, styles.logoutText]}>Logout</Text>
             <Icon name="chevron-right" size={24} color="#ff6b6b" />
           </TouchableOpacity>
         </View>
@@ -330,6 +370,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
   avatarText: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -342,6 +389,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 3,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
     marginBottom: 5,
   },
   userLevel: {
@@ -531,11 +583,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
   },
-  settingsSection: {
+  actionsSection: {
     paddingHorizontal: 20,
     marginBottom: 40,
   },
-  settingItem: {
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -543,7 +595,7 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 10,
   },
-  settingText: {
+  actionText: {
     flex: 1,
     fontSize: 16,
     color: '#fff',

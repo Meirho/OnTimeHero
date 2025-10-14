@@ -10,40 +10,50 @@ class LockService {
     this.appStateSubscription = null;
   }
 
-  startLockMode(event, onUnlock) {
-    this.isLocked = true;
-    this.currentEvent = event;
-    this.onUnlockCallback = onUnlock;
+  async startLockMode(event, onUnlock) {
+    try {
+      const lockDuration = await AsyncStorage.getItem('lockDuration');
+      const defaultLockDuration = lockDuration ? parseInt(lockDuration) : 30; // minutes
+      
+      this.isLocked = true;
+      this.currentEvent = event;
+      this.onUnlockCallback = onUnlock;
 
-    // Store lock state
-    AsyncStorage.setItem('lockMode', JSON.stringify({
-      isLocked: true,
-      eventId: event.id,
-      startTime: new Date().toISOString(),
-    }));
+      // Store lock state
+      await AsyncStorage.setItem('lockMode', JSON.stringify({
+        isLocked: true,
+        eventId: event.id,
+        startTime: new Date().toISOString(),
+        lockDuration: defaultLockDuration,
+      }));
 
-    // Start location tracking
-    this.startLocationTracking();
+      // Start location tracking
+      this.startLocationTracking();
 
-    // Monitor app state
-    this.appStateSubscription = AppState.addEventListener(
-      'change',
-      this.handleAppStateChange
-    );
+      // Monitor app state
+      this.appStateSubscription = AppState.addEventListener(
+        'change',
+        this.handleAppStateChange
+      );
 
-    // Set timer for auto-unlock at event start time
-    const eventTime = new Date(event.startTime.toDate());
-    const now = new Date();
-    const timeUntilEvent = eventTime - now;
+      // Set timer for auto-unlock at event start time
+      const eventTime = new Date(event.startTime.toDate());
+      const now = new Date();
+      const timeUntilEvent = eventTime - now;
 
-    if (timeUntilEvent > 0) {
-      this.lockTimer = setTimeout(() => {
-        this.unlock('Event started');
-      }, timeUntilEvent);
+      if (timeUntilEvent > 0) {
+        this.lockTimer = setTimeout(() => {
+          this.unlock('Event started');
+        }, timeUntilEvent);
+      }
+
+      // Block app switching (platform specific implementation needed)
+      this.blockAppSwitching();
+      
+      console.log(`Phone locked for ${defaultLockDuration} minutes before event`);
+    } catch (error) {
+      console.error('Error starting lock mode:', error);
     }
-
-    // Block app switching (platform specific implementation needed)
-    this.blockAppSwitching();
   }
 
   handleAppStateChange = (nextAppState) => {
@@ -168,24 +178,93 @@ class LockService {
 
     // Update event status
     if (this.currentEvent) {
-      this.updateEventCompletion(reason === 'Arrived at location');
+      // Check if arrived on time
+      const eventTime = new Date(this.currentEvent.startTime.toDate ? this.currentEvent.startTime.toDate() : this.currentEvent.startTime);
+      const now = new Date();
+      const isOnTime = now <= eventTime; // Arrived before or at event time
+      
+      console.log('🎯 Unlock reason:', reason);
+      console.log('🎯 Event time:', eventTime);
+      console.log('🎯 Current time:', now);
+      console.log('🎯 Is on time:', isOnTime);
+      
+      this.updateEventCompletion(isOnTime);
     }
   }
 
   async updateEventCompletion(arrivedOnTime) {
-    // Update event in Firestore
-    // Implementation in GoogleCalendarService
+    if (!this.currentEvent) return;
+
+    try {
+      console.log('🎯 Updating event completion for:', this.currentEvent.title);
+      console.log('🎯 Arrived on time:', arrivedOnTime);
+
+      // Import services
+      const firestore = require('@react-native-firebase/firestore').default;
+      const GamificationService = require('./GamificationService').default;
+      const NotificationService = require('./NotificationService').default;
+
+      // Update event status in Firestore
+      if (!this.currentEvent.isLocal) {
+        await firestore().collection('events').doc(this.currentEvent.id).update({
+          status: 'completed',
+          completedAt: firestore.FieldValue.serverTimestamp(),
+          arrivedOnTime: arrivedOnTime,
+        });
+        console.log('✅ Event status updated in Firestore');
+      }
+
+      // Update local events
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const localEventsData = await AsyncStorage.getItem('localEvents');
+      if (localEventsData) {
+        const events = JSON.parse(localEventsData);
+        const updatedEvents = events.map(event => 
+          event.id === this.currentEvent.id 
+            ? { ...event, status: 'completed', completedAt: new Date().toISOString(), arrivedOnTime }
+            : event
+        );
+        await AsyncStorage.setItem('localEvents', JSON.stringify(updatedEvents));
+        console.log('✅ Local event status updated');
+      }
+
+      // Award points and achievements
+      if (arrivedOnTime) {
+        console.log('🏆 Awarding points for on-time arrival');
+        const pointsAwarded = await GamificationService.awardPoints(50, 'On-time arrival');
+        await GamificationService.checkAndAwardBadges();
+        
+        console.log('🎯 Points awarded:', pointsAwarded);
+        
+        // Show achievement notification with points
+        NotificationService.showArrivalNotification(this.currentEvent, true, pointsAwarded);
+      } else {
+        console.log('⚠️ Late arrival - no points awarded');
+        NotificationService.showArrivalNotification(this.currentEvent, false, 0);
+      }
+
+    } catch (error) {
+      console.error('❌ Error updating event completion:', error);
+    }
   }
 
-  emergencyUnlock(pin) {
-    // Verify emergency PIN
-    const correctPin = '1234'; // In production, store securely
-    
-    if (pin === correctPin) {
-      this.unlock('Emergency unlock');
-      return true;
+  async emergencyUnlock(pin) {
+    try {
+      // Get the user's emergency PIN from storage
+      const storedPin = await AsyncStorage.getItem('emergencyPin');
+      const correctPin = storedPin || '1234'; // Default fallback
+      
+      console.log('Verifying PIN:', pin, 'against stored PIN:', correctPin);
+      
+      if (pin === correctPin) {
+        this.unlock('Emergency unlock');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error verifying emergency PIN:', error);
+      return false;
     }
-    return false;
   }
 }
 

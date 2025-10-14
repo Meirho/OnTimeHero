@@ -16,7 +16,10 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 GoogleSignin.configure({
-  webClientId: '103336096230-7ujf978u25uj50dp43se69t7idqfggi8.apps.googleusercontent.com',
+  scopes: ['https://www.googleapis.com/auth/calendar', 'email', 'profile'],
+  webClientId: '574885181091-rutnfbrqmiu01gjlp7gsfvo3mc2n8ecs.apps.googleusercontent.com',
+  offlineAccess: true,
+  forceCodeForRefreshToken: true,
 });
 
 const LoginScreen = ({ navigation }) => {
@@ -43,11 +46,83 @@ const LoginScreen = ({ navigation }) => {
   const handleGoogleSignIn = async () => {
     try {
       await GoogleSignin.hasPlayServices();
-      const { idToken } = await GoogleSignin.signIn();
+      const { idToken, user } = await GoogleSignin.signIn();
       const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-      await auth().signInWithCredential(googleCredential);
+      const firebaseUser = await auth().signInWithCredential(googleCredential);
+      
+      // Update Firebase user profile with Google data
+      if (user && firebaseUser.user) {
+        await updateFirebaseUserProfile(firebaseUser.user, user);
+        await importGoogleProfileData(firebaseUser.user, user);
+      }
     } catch (error) {
       Alert.alert('Google Sign In Error', error.message);
+    }
+  };
+
+  const updateFirebaseUserProfile = async (firebaseUser, googleUser) => {
+    try {
+      const updates = {};
+      
+      if (googleUser.name && !firebaseUser.displayName) {
+        updates.displayName = googleUser.name;
+      }
+      
+      if (googleUser.photo && !firebaseUser.photoURL) {
+        updates.photoURL = googleUser.photo;
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        await firebaseUser.updateProfile(updates);
+        console.log('Firebase user profile updated with Google data');
+      }
+    } catch (error) {
+      console.error('Error updating Firebase user profile:', error);
+    }
+  };
+
+  const importGoogleProfileData = async (firebaseUser, googleUser) => {
+    try {
+      const firestoreInstance = require('@react-native-firebase/firestore').default;
+      
+      // Check if Firestore is available
+      await firestoreInstance().enableNetwork();
+      
+      const userRef = firestoreInstance().collection('users').doc(firebaseUser.uid);
+      
+      const userData = {
+        displayName: googleUser.name || firebaseUser.displayName,
+        email: googleUser.email || firebaseUser.email,
+        photoURL: googleUser.photo || firebaseUser.photoURL,
+        googleId: googleUser.id,
+        lastSignIn: firestoreInstance.FieldValue.serverTimestamp(),
+        createdAt: firestoreInstance.FieldValue.serverTimestamp(),
+      };
+      
+      await userRef.set(userData, { merge: true });
+      console.log('Google profile data imported successfully');
+    } catch (error) {
+      console.error('Error importing Google profile data:', error);
+      
+      // If Firestore is unavailable, store profile data locally
+      if (error.code === 'unavailable') {
+        console.log('Firestore unavailable, storing profile data locally');
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          const profileData = {
+            displayName: googleUser.name || firebaseUser.displayName,
+            email: googleUser.email || firebaseUser.email,
+            photoURL: googleUser.photo || firebaseUser.photoURL,
+            googleId: googleUser.id,
+            lastSignIn: new Date().toISOString(),
+          };
+          await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+          console.log('Profile data stored locally');
+        } catch (localError) {
+          console.error('Error storing profile locally:', localError);
+        }
+      }
+      // Don't throw error to prevent sign-in failure
     }
   };
 

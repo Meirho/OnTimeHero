@@ -58,51 +58,88 @@ const PhoneLockScreen = ({ route, navigation }) => {
     HapticFeedback.trigger('notificationSuccess');
     
     // Navigate based on unlock reason
-    if (reason === 'Arrived at location') {
-      // Show success and award points
-      Alert.alert(
-        '🎉 Great Job!',
-        'You arrived on time! +50 XP earned!',
-        [
-          {
-            text: 'Awesome!',
-            onPress: () => navigation.replace('Dashboard'),
-          },
-        ]
-      );
+    if (reason === 'Manual arrival confirmation' || reason === 'Arrived at location') {
+      // Check if arrived on time
+      const eventTime = new Date(event.startTime.toDate());
+      const now = new Date();
+      const isOnTime = now <= eventTime;
+      
+      if (isOnTime) {
+        Alert.alert(
+          '🎉 Well Done!',
+          'You arrived on time! +50 XP earned!',
+          [
+            {
+              text: 'Awesome!',
+              onPress: () => navigation.navigate('MainTabs'),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          '⚠️ Late Arrival',
+          'You arrived late. Try to leave earlier next time.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('MainTabs'),
+            },
+          ]
+        );
+      }
     } else {
-      navigation.replace('Dashboard');
+      Alert.alert('Unlocked!', `Phone unlocked: ${reason}`, [
+        { text: 'OK', onPress: () => navigation.navigate('MainTabs') }
+      ]);
     }
   };
 
   const handleArrived = () => {
     HapticFeedback.trigger('impactLight');
+    
+    // Check if user arrived on time
+    const eventTime = new Date(event.startTime.toDate());
+    const now = new Date();
+    const isOnTime = now <= eventTime; // Arrived before or at event time
+    
+    console.log('🎯 Manual arrival confirmed');
+    console.log('🎯 Event time:', eventTime);
+    console.log('🎯 Current time:', now);
+    console.log('🎯 Is on time:', isOnTime);
+    
     LockService.unlock('Manual arrival confirmation');
   };
 
-  const handleEmergencyUnlock = () => {
+  const handleEmergencyUnlock = async () => {
     if (emergencyPin.length !== 4) {
       Alert.alert('Error', 'Please enter a 4-digit PIN');
       return;
     }
 
-    if (LockService.emergencyUnlock(emergencyPin)) {
-      setShowEmergencyModal(false);
-      // Penalty for emergency unlock
-      Alert.alert(
-        'Phone Unlocked',
-        'Emergency unlock used. -10 XP penalty.',
-        [{ text: 'OK', onPress: () => navigation.replace('Dashboard') }]
-      );
-    } else {
-      setAttempts(attempts + 1);
-      if (attempts >= 2) {
-        Alert.alert('Too Many Attempts', 'Please wait for the event to start.');
+    try {
+      const isValid = await LockService.emergencyUnlock(emergencyPin);
+      
+      if (isValid) {
         setShowEmergencyModal(false);
+        // Penalty for emergency unlock
+        Alert.alert(
+          'Phone Unlocked',
+          'Emergency unlock used. -10 XP penalty.',
+          [{ text: 'OK', onPress: () => navigation.navigate('MainTabs') }]
+        );
       } else {
-        Alert.alert('Incorrect PIN', `${2 - attempts} attempts remaining`);
+        setAttempts(attempts + 1);
+        if (attempts >= 2) {
+          Alert.alert('Too Many Attempts', 'Please wait for the event to start.');
+          setShowEmergencyModal(false);
+        } else {
+          Alert.alert('Incorrect PIN', `${2 - attempts} attempts remaining`);
+        }
+        setEmergencyPin('');
       }
-      setEmergencyPin('');
+    } catch (error) {
+      console.error('Emergency unlock error:', error);
+      Alert.alert('Error', 'Failed to verify PIN. Please try again.');
     }
   };
 

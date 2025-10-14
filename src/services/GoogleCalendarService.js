@@ -12,20 +12,13 @@ class GoogleCalendarService {
     try {
       GoogleSignin.configure({
         // Request Calendar read access and profile/email for Firebase linking
-        scopes: ['https://www.googleapis.com/auth/calendar.readonly', 'email', 'profile'],
-        webClientId: '103336096230-8lm4urgu3a703cb0cj3lsdfj3uo6b36r.apps.googleusercontent.com',
+        scopes: ['https://www.googleapis.com/auth/calendar', 'email', 'profile'],
+        // Web Client ID is required for Google Sign-In to work properly
+        webClientId: '574885181091-rutnfbrqmiu01gjlp7gsfvo3mc2n8ecs.apps.googleusercontent.com',
         offlineAccess: true,
         forceCodeForRefreshToken: true,
-        // Mobile app configuration - NO client secret needed
-        hostedDomain: '',
-        loginHint: '',
-        accountName: '',
-        // Disable auto sign-in to avoid NativeEventEmitter issues
-        autoSignIn: false,
-        // Explicitly disable client secret usage for mobile apps
-        clientSecret: undefined,
       });
-      console.log('Google Sign-In configured successfully for mobile app');
+      console.log('Google Sign-In configured successfully with Web Client ID');
     } catch (error) {
       console.error('Error configuring Google Sign-In:', error);
     }
@@ -68,13 +61,17 @@ class GoogleCalendarService {
     try {
       console.log('Starting calendar sync...');
       
+      // First, try to sync any pending data
+      await this.syncPendingData();
+      
       // Ensure the user is signed in with Calendar scope
       const userInfo = await this.ensureSignedIn();
       if (!userInfo) {
         throw new Error('User not signed in');
       }
 
-      console.log('User signed in, getting tokens...');
+      console.log('User signed in successfully:', userInfo.user?.email);
+      console.log('Getting tokens...');
       const tokens = await GoogleSignin.getTokens();
       const accessToken = tokens.accessToken;
 
@@ -82,7 +79,7 @@ class GoogleCalendarService {
         throw new Error('No access token available');
       }
 
-      console.log('Fetching calendar events...');
+      console.log('Access token obtained, fetching calendar events...');
       // Fetch events from Google Calendar API
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
@@ -105,11 +102,14 @@ class GoogleCalendarService {
       }
 
       const data = await response.json();
-      console.log('Calendar API response:', data);
+      console.log('Calendar API response received:', data);
       
-      if (data.items) {
+      if (data.items && data.items.length > 0) {
         console.log(`Found ${data.items.length} events, saving to Firestore...`);
         await this.saveEventsToFirestore(data.items);
+        console.log('Events saved to Firestore successfully');
+      } else {
+        console.log('No events found in the next 30 days');
       }
 
       return data.items || [];
@@ -121,50 +121,94 @@ class GoogleCalendarService {
 
   async saveEventsToFirestore(googleEvents) {
     const currentUser = auth().currentUser;
-    if (!currentUser) return;
-
-    const batch = firestore().batch();
-    const eventsRef = firestore().collection('events');
-
-    for (const googleEvent of googleEvents) {
-      // Skip all-day events or events without dateTime
-      if (!googleEvent.start?.dateTime) continue;
-
-      const eventData = {
-        userId: currentUser.uid,
-        googleEventId: googleEvent.id,
-        title: googleEvent.summary || 'Untitled Event',
-        description: googleEvent.description || '',
-        startTime: firestore.Timestamp.fromDate(
-          new Date(googleEvent.start.dateTime)
-        ),
-        endTime: firestore.Timestamp.fromDate(
-          new Date(googleEvent.end.dateTime)
-        ),
-        location: googleEvent.location || '',
-        travelTime: this.estimateTravelTime(googleEvent.location),
-        status: 'upcoming',
-        createdAt: firestore.Timestamp.now(),
-        lastSynced: firestore.Timestamp.now(),
-      };
-
-      // Check if event already exists
-      const existingEvent = await eventsRef
-        .where('googleEventId', '==', googleEvent.id)
-        .where('userId', '==', currentUser.uid)
-        .get();
-
-      if (existingEvent.empty) {
-        // Create new event
-        const newEventRef = eventsRef.doc();
-        batch.set(newEventRef, eventData);
-      } else {
-        // Update existing event
-        batch.update(existingEvent.docs[0].ref, eventData);
-      }
+    if (!currentUser) {
+      console.log('No current user, skipping Firestore save');
+      return;
     }
 
-    await batch.commit();
+    try {
+      console.log(`Saving ${googleEvents.length} events to Firestore...`);
+      
+      // Check Firestore availability first
+      await firestore().enableNetwork();
+      console.log('Firestore network enabled');
+      
+      const batch = firestore().batch();
+      const eventsRef = firestore().collection('events');
+      let eventsToSave = 0;
+
+      for (const googleEvent of googleEvents) {
+        // Skip all-day events or events without dateTime
+        if (!googleEvent.start?.dateTime) {
+          console.log('Skipping all-day event:', googleEvent.summary);
+          continue;
+        }
+
+        // Parse the event time properly with timezone handling
+        const startDateTime = new Date(googleEvent.start.dateTime);
+        const endDateTime = new Date(googleEvent.end.dateTime);
+        
+        console.log('Processing event:', googleEvent.summary);
+        console.log('Start dateTime from Google:', googleEvent.start.dateTime);
+        console.log('Start dateTime parsed:', startDateTime);
+        console.log('Start timezone:', googleEvent.start.timeZone);
+        
+        const eventData = {
+          userId: currentUser.uid,
+          googleEventId: googleEvent.id,
+          title: googleEvent.summary || 'Untitled Event',
+          description: googleEvent.description || '',
+          startTime: firestore.Timestamp.fromDate(startDateTime),
+          endTime: firestore.Timestamp.fromDate(endDateTime),
+          location: googleEvent.location || '',
+          travelTime: this.estimateTravelTime(googleEvent.location),
+          status: 'upcoming',
+          createdAt: firestore.Timestamp.now(),
+          lastSynced: firestore.Timestamp.now(),
+          timezone: googleEvent.start.timeZone || 'UTC',
+        };
+
+        // Check if event already exists
+        const existingEvent = await eventsRef
+          .where('googleEventId', '==', googleEvent.id)
+          .where('userId', '==', currentUser.uid)
+          .get();
+
+        if (existingEvent.empty) {
+          // Create new event
+          const newEventRef = eventsRef.doc();
+          batch.set(newEventRef, eventData);
+          eventsToSave++;
+        } else {
+          // Update existing event
+          batch.update(existingEvent.docs[0].ref, eventData);
+          eventsToSave++;
+        }
+      }
+
+      if (eventsToSave > 0) {
+        await batch.commit();
+        console.log(`Successfully saved ${eventsToSave} events to Firestore`);
+      } else {
+        console.log('No new events to save');
+      }
+    } catch (error) {
+      console.error('Error saving events to Firestore:', error);
+      
+      // If Firestore is unavailable, try to save events locally for later sync
+      if (error.code === 'unavailable') {
+        console.log('Firestore unavailable, storing events locally for later sync');
+        try {
+          const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+          const localEvents = JSON.stringify(googleEvents);
+          await AsyncStorage.setItem('pendingEvents', localEvents);
+          console.log('Events stored locally for later sync');
+        } catch (localError) {
+          console.error('Error storing events locally:', localError);
+        }
+      }
+      // Don't throw error here to prevent sync failure
+    }
   }
 
   estimateTravelTime(location) {
@@ -242,6 +286,44 @@ class GoogleCalendarService {
 
       transaction.update(userRef, updates);
     });
+  }
+
+  async syncPendingData() {
+    try {
+      console.log('Checking for pending data to sync...');
+      
+      // Check if Firestore is available
+      await firestore().enableNetwork();
+      
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      
+      // Sync pending events
+      const pendingEvents = await AsyncStorage.getItem('pendingEvents');
+      if (pendingEvents) {
+        console.log('Found pending events, syncing to Firestore...');
+        const events = JSON.parse(pendingEvents);
+        await this.saveEventsToFirestore(events);
+        await AsyncStorage.removeItem('pendingEvents');
+        console.log('Pending events synced successfully');
+      }
+      
+      // Sync pending profile data
+      const pendingProfile = await AsyncStorage.getItem('userProfile');
+      if (pendingProfile) {
+        console.log('Found pending profile data, syncing to Firestore...');
+        const profileData = JSON.parse(pendingProfile);
+        const currentUser = auth().currentUser;
+        if (currentUser) {
+          const userRef = firestore().collection('users').doc(currentUser.uid);
+          await userRef.set(profileData, { merge: true });
+          await AsyncStorage.removeItem('userProfile');
+          console.log('Pending profile data synced successfully');
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error syncing pending data:', error);
+    }
   }
 }
 

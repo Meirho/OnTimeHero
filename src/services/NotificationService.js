@@ -5,38 +5,63 @@ import moment from 'moment';
 
 class NotificationService {
   constructor() {
-    this.configure();
+    this.initialize();
     this.createChannels();
+  }
+
+  async initialize() {
+    await this.configure();
   }
 
   static initialize() {
     return new NotificationService();
   }
 
-  configure() {
-    PushNotification.configure({
-      onRegister: function (token) {
-        console.log('TOKEN:', token);
-      },
+  async configure() {
+    try {
+      // Request permissions explicitly
+      const granted = await PushNotification.requestPermissions();
+      console.log('📱 Notification permissions granted:', granted);
+      
+      PushNotification.configure({
+        onRegister: function (token) {
+          console.log('TOKEN:', token);
+        },
 
-      onNotification: function (notification) {
-        console.log('NOTIFICATION:', notification);
-        
-        // Handle notification tap
-        if (notification.userInteraction) {
-          NotificationService.handleNotificationTap(notification);
-        }
-      },
+        onNotification: function (notification) {
+          console.log('NOTIFICATION:', notification);
+          
+          // Handle notification tap
+          if (notification.userInteraction) {
+            NotificationService.handleNotificationTap(notification);
+          }
+        },
 
-      permissions: {
-        alert: true,
-        badge: true,
-        sound: true,
-      },
+        permissions: {
+          alert: true,
+          badge: true,
+          sound: true,
+        },
 
-      popInitialNotification: true,
-      requestPermissions: true,
-    });
+        popInitialNotification: true,
+        requestPermissions: true,
+      });
+    } catch (error) {
+      console.error('❌ Error configuring notifications:', error);
+    }
+  }
+
+  async requestPermissions() {
+    try {
+      console.log('📱 Requesting notification permissions...');
+      const granted = await PushNotification.requestPermissions();
+      console.log('📱 Notification permissions granted:', granted);
+      return granted;
+    } catch (error) {
+      console.error('❌ Error requesting notification permissions:', error);
+      throw error;
+    }
+  }
 
     // Handle background messages
     messaging().setBackgroundMessageHandler(async remoteMessage => {
@@ -110,42 +135,71 @@ class NotificationService {
     });
   }
 
-  scheduleTimeToLeaveNotification(event) {
-    const eventTime = moment(event.startTime.toDate());
-    const travelTime = event.travelTime || 15;
-    const notifyTime = eventTime.subtract(travelTime, 'minutes').toDate();
+  async scheduleEventNotifications(event) {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      
+      // Get user preferences or use defaults (30 min and 15 min)
+      const reminder1Minutes = await AsyncStorage.getItem('reminder1Minutes');
+      const reminder2Minutes = await AsyncStorage.getItem('reminder2Minutes');
+      
+      const firstReminderMinutes = reminder1Minutes ? parseInt(reminder1Minutes) : 30;
+      const secondReminderMinutes = reminder2Minutes ? parseInt(reminder2Minutes) : 15;
+      
+      const eventTime = moment(event.startTime.toDate ? event.startTime.toDate() : event.startTime);
+      const now = moment();
+      
+      console.log(`Scheduling notifications for event: ${event.title}`);
+      console.log(`Event time: ${eventTime.format('YYYY-MM-DD HH:mm')}`);
+      console.log(`First reminder: ${firstReminderMinutes} minutes before`);
+      console.log(`Second reminder: ${secondReminderMinutes} minutes before`);
+      
+      // Schedule first reminder (default 30 minutes before)
+      const firstReminderTime = eventTime.clone().subtract(firstReminderMinutes, 'minutes');
+      if (firstReminderTime.isAfter(now)) {
+        PushNotification.localNotificationSchedule({
+          id: `${event.id}_reminder1`,
+          channelId: 'reminders',
+          title: '📅 Upcoming Event',
+          message: `${event.title} starts in ${firstReminderMinutes} minutes. Get ready!`,
+          date: firstReminderTime.toDate(),
+          allowWhileIdle: true,
+          playSound: true,
+          soundName: 'default',
+          vibrate: true,
+          data: {
+            eventId: event.id,
+            type: 'reminder1',
+          },
+        });
+        console.log(`✅ First reminder scheduled for: ${firstReminderTime.format('YYYY-MM-DD HH:mm')}`);
+      }
 
-    PushNotification.localNotificationSchedule({
-      channelId: 'time-to-leave',
-      title: '⏰ Time to Leave!',
-      message: `Leave now for ${event.title} at ${event.location}`,
-      date: notifyTime,
-      allowWhileIdle: true,
-      repeatType: null,
-      playSound: true,
-      soundName: 'alarm.mp3',
-      vibrate: true,
-      vibration: 1000,
-      data: {
-        eventId: event.id,
-        type: 'time-to-leave',
-      },
-      actions: ['Leave Now', 'Snooze 5 min'],
-    });
-
-    // Schedule a reminder 30 minutes before
-    const reminderTime = eventTime.subtract(30, 'minutes').toDate();
-    PushNotification.localNotificationSchedule({
-      channelId: 'reminders',
-      title: 'Upcoming Event',
-      message: `${event.title} starts in 30 minutes`,
-      date: reminderTime,
-      allowWhileIdle: true,
-      data: {
-        eventId: event.id,
-        type: 'reminder',
-      },
-    });
+      // Schedule second reminder / time to leave (default 15 minutes before)
+      const secondReminderTime = eventTime.clone().subtract(secondReminderMinutes, 'minutes');
+      if (secondReminderTime.isAfter(now)) {
+        PushNotification.localNotificationSchedule({
+          id: `${event.id}_reminder2`,
+          channelId: 'time-to-leave',
+          title: '⏰ Time to Leave!',
+          message: `Leave now for ${event.title}${event.location ? ` at ${event.location}` : ''}`,
+          date: secondReminderTime.toDate(),
+          allowWhileIdle: true,
+          playSound: true,
+          soundName: 'default',
+          vibrate: true,
+          vibration: 1000,
+          data: {
+            eventId: event.id,
+            type: 'time-to-leave',
+          },
+          actions: ['Leave Now', 'Snooze 5 min'],
+        });
+        console.log(`✅ Second reminder scheduled for: ${secondReminderTime.format('YYYY-MM-DD HH:mm')}`);
+      }
+    } catch (error) {
+      console.error('Error scheduling event notifications:', error);
+    }
   }
 
   cancelNotification(notificationId) {
@@ -157,16 +211,16 @@ class NotificationService {
     
     switch (type) {
       case 'time-to-leave':
-        // Navigate to lock screen
-        NavigationService.navigate('PhoneLock', { eventId });
+        // Navigate to lock screen - will be handled by app navigation
+        console.log('Time to leave notification tapped for event:', eventId);
         break;
       case 'reminder':
-        // Navigate to event details
-        NavigationService.navigate('EventDetails', { eventId });
+        // Navigate to event details - will be handled by app navigation
+        console.log('Reminder notification tapped for event:', eventId);
         break;
       case 'achievement':
-        // Navigate to rewards
-        NavigationService.navigate('Rewards');
+        // Navigate to rewards - will be handled by app navigation
+        console.log('Achievement notification tapped');
         break;
       default:
         break;
@@ -224,10 +278,10 @@ class NotificationService {
     });
   }
 
-  showArrivalNotification(event, wasOnTime) {
+  showArrivalNotification(event, wasOnTime, pointsAwarded = 50) {
     const title = wasOnTime ? '🎉 Great Job!' : '⚠️ Running Late';
     const message = wasOnTime 
-      ? `You arrived on time for "${event.title}"! +50 XP`
+      ? `You arrived on time for "${event.title}"! +${pointsAwarded} XP earned!`
       : `You're running late for "${event.title}". Try to leave earlier next time.`;
 
     PushNotification.localNotification({
@@ -240,6 +294,7 @@ class NotificationService {
         type: 'arrival',
         eventId: event.id,
         wasOnTime,
+        pointsAwarded: pointsAwarded,
       },
     });
   }

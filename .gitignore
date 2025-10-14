@@ -105,4 +105,23 @@ build/
 *~
 
 # OS generated files
-Thumbs.dbclient_secret_*.json
+Thumbs.db
+
+# Google OAuth credentials
+client_secret_*.json
+google-services*.json
+GoogleService-Info.plist
+
+# API Keys and secrets
+.env
+.env.local
+.env.production
+*.env
+
+# Backup files
+backup_*/
+*.backup
+
+# Temporary files
+*.tmp
+*.temp

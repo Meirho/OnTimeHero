@@ -7,13 +7,13 @@ import { getAnalytics } from "firebase/analytics";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAV_L0BOnBtzSo4qmOr1R3tavEtn02ELnQ",
-  authDomain: "ontimehero-419c0.firebaseapp.com",
-  projectId: "ontimehero-419c0",
-  storageBucket: "ontimehero-419c0.firebasestorage.app",
-  messagingSenderId: "103336096230",
-  appId: "1:103336096230:web:df986129980bad75c02627",
-  measurementId: "G-KNVPSCKDSC"
+  apiKey: "AIzaSyDo0VLL27mwlpRh4EFXP3e6KZd1g8Xf2VI",
+  authDomain: "ontimehero-new.firebaseapp.com",
+  projectId: "ontimehero-new",
+  storageBucket: "ontimehero-new.firebasestorage.app",
+  messagingSenderId: "574885181091",
+  appId: "1:574885181091:android:418390775e2ba4382ff116",
+  measurementId: "G-XXXXXXXXXX"
 };
 
 // Initialize Firebase

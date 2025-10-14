@@ -49,6 +49,9 @@ const NextEventCard = ({ event, onLeaveNow }) => {
         </View>
       )}
 
+      <Text style={styles.eventDate}>
+        {moment(event.startTime.toDate()).format('dddd, MMMM D')}
+      </Text>
       <Text style={styles.eventTime}>
         {moment(event.startTime.toDate()).format('h:mm A')}
       </Text>
@@ -105,6 +108,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     marginLeft: 5,
+  },
+  eventDate: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 5,
+    fontWeight: '500',
   },
   eventTime: {
     fontSize: 32,

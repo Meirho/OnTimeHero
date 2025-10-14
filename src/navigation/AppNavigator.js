@@ -10,6 +10,9 @@ import SignupScreen from '../screens/auth/SignupScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import CalendarScreen from '../screens/main/CalendarScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import AddEventScreen from '../screens/main/AddEventScreen';
+import SettingsScreen from '../screens/main/SettingsScreen';
+import HelpScreen from '../screens/main/HelpScreen';
 import PhoneLockScreen from '../screens/alerts/PhoneLockScreen';
 
 const Stack = createStackNavigator();
@@ -52,6 +55,9 @@ const AppNavigator = () => {
       {user ? (
         <>
           <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+          <Stack.Screen name="AddEvent" component={AddEventScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="HelpScreen" component={HelpScreen} />
           <Stack.Screen name="PhoneLock" component={PhoneLockScreen} />
         </>
       ) : (

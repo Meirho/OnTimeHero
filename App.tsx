@@ -12,9 +12,6 @@ import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppNavigator from './src/navigation/AppNavigator';
 import NotificationService from './src/services/NotificationService';
-import GamificationService from './src/services/GamificationService';
-import LocationService from './src/services/LocationService';
-import GoogleCalendarService from './src/services/GoogleCalendarService';
 import { AuthProvider } from './src/contexts/AuthContext';
 
 const App = () => {
@@ -22,10 +19,10 @@ const App = () => {
   const [user, setUser] = useState();
 
   useEffect(() => {
-    // Initialize all services
-    initializeServices();
+    // Initialize notification service
+    // NotificationService is already initialized as a singleton
     
-    // Request permissions
+    // Request notification permissions
     requestNotificationPermission();
     
     // Handle authentication state changes
@@ -44,23 +41,6 @@ const App = () => {
       clearTimeout(timeoutId);
     };
   }, []);
-
-  const initializeServices = async () => {
-    try {
-      // NotificationService is a singleton; no explicit initialize call needed
-      
-      // Request location permission
-      await LocationService.requestLocationPermission();
-      
-      // Schedule daily motivation and weekly reports
-      NotificationService.scheduleDailyMotivation();
-      NotificationService.scheduleWeeklyReport();
-      
-      console.log('All services initialized successfully');
-    } catch (error) {
-      console.error('Error initializing services:', error);
-    }
-  };
 
   const requestNotificationPermission = async () => {
     const authStatus = await messaging().requestPermission();
